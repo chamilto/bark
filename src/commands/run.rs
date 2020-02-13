@@ -1,54 +1,83 @@
-use crate::util::bark_print;
+use crate::util::{bark_print, get_bark_dir, get_db_conn};
 
-pub fn on_run(api_name: String, env_name: String, action_name: String, args: Vec<&str>) {
-    // check if api exists
-    // check if action exists
-    // load the path/method/host etc
-    // if method is post/put - look up the payload file and load it
-    // if the payload file doesn't exist - print a warning that we're posting or putting without
+fn format_path(path: &mut String, args: &Vec<&str>) {
+    for (idx, arg) in args.iter().enumerate() {
+        *path = path.replace(&format!("{{{}}}", idx), arg);
+    }
+}
+
+fn get_action_cursor<'a>(
+    db: &'a sqlite::Connection,
+    api_name: &String,
+    env_name: &String,
+    action_name: &String,
+) -> sqlite::Cursor<'a> {
+    let mut cursor = db
+        .prepare(
+            "SELECT env.host, action.method, action.path, action.payload_filename
+             FROM action
+             JOIN env on env.id = action.env_id
+             JOIN api on env.api_id = api.id
+             WHERE api.name = ? AND action.name = ? AND env.name = ? ;
+        ",
+        )
+        .unwrap()
+        .cursor();
+
+    cursor
+        .bind(&[
+            sqlite::Value::String(api_name.clone()),
+            sqlite::Value::String(action_name.clone()),
+            sqlite::Value::String(env_name.clone()),
+        ])
+        .unwrap();
+
+    cursor
+}
+
+pub fn on_run(api_name: String, env_name: String, action_name: String, args: &Vec<&str>) {
     // data
     // set up timer
     // make request
     // end timer
     // print response details
-    let host = String::from("http://localhost:8000");
-    let method = String::from("GET");
-    let mut path = String::from("/tenants/{0}/users/{1}");
+    let db = get_db_conn();
+    let mut cursor = get_action_cursor(&db, &api_name, &env_name, &action_name);
 
-    // really hacky
-    // has to be a better way to do this
-    match args.len() {
-        1 => {
-            path = path.replace("{0}", args[0]);
-        }
-        2 => {
-            path = path.replace("{0}", args[0]);
-            path = path.replace("{1}", args[1]);
-        }
-        3 => {
-            path = path.replace("{0}", args[0]);
-            path = path.replace("{1}", args[1]);
-            path = path.replace("{2}", args[2]);
-        }
-        4 => {
-            path = path.replace("{0}", args[0]);
-            path = path.replace("{1}", args[1]);
-            path = path.replace("{2}", args[2]);
-            path = path.replace("{3}", args[3]);
-        }
-        5 => {
-            path = path.replace("{0}", args[0]);
-            path = path.replace("{1}", args[1]);
-            path = path.replace("{2}", args[2]);
-            path = path.replace("{3}", args[3]);
-            path = path.replace("{4}", args[4]);
-        }
-        _ => {}
+    let host;
+    let method;
+    let mut path;
+    let payload_filename;
+
+    if let Some(row) = cursor.next().unwrap() {
+        host = row[0].as_string().unwrap();
+        method = row[1].as_string().unwrap();
+        path = row[2].as_string().unwrap().to_string();
+        payload_filename = row[3].as_string().unwrap_or("");
+    } else {
+        bark_print(String::from("Action not found."));
+        return;
     }
 
+    format_path(&mut path, args);
+
     bark_print(format!(
-        "Executing {}-{}:{} with args {:?}",
+        "Executing {} (env:{}): {} with args {:?}",
         api_name, env_name, action_name, args
     ));
-    bark_print(format!("Making {} request to {}{}", method, host, path));
+
+    if payload_filename != "" {
+        bark_print(format!(
+            "Making {} request to {}{} with payload {}",
+            method, host, path, payload_filename
+        ));
+    } else {
+        if ["POST", "PUT"].contains(&method) {
+            bark_print(format!(
+                "Warning: No payload file found. Making {} request with no request body.",
+                method
+            ))
+        }
+        bark_print(format!("Making {} request to {}{}", method, host, path,));
+    }
 }

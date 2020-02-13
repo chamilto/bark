@@ -34,6 +34,9 @@ pub fn get_app<'a, 'b>() -> App<'a, 'b> {
                             .arg(
                                 Arg::with_name("api_host")
                                     .required(true)
+                                    .long("host")
+                                    .takes_value(true)
+                                    .value_name("api_host")
                                     .help("The API host address for the environment."),
                             ),
                     )

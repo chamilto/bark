@@ -35,7 +35,7 @@ fn main() {
             String::from(run_matches.value_of("api_name").unwrap()),
             String::from(run_matches.value_of("env_name").unwrap()),
             String::from(run_matches.value_of("action_name").unwrap()),
-            run_matches
+            &run_matches
                 .values_of("action_arg_list")
                 .unwrap_or(Values::default())
                 .collect(),
