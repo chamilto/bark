@@ -1,15 +1,7 @@
 extern crate ini;
 
-use ini::Ini;
-
 pub fn bark_print(msg: String) {
     println!("bark: {}", msg);
-}
-
-pub fn get_config() -> ini::Ini {
-    let bark_dir = get_bark_dir();
-    let conf_path = format!("{}/conf.ini", bark_dir);
-    return Ini::load_from_file(&conf_path).unwrap();
 }
 
 pub fn get_db_conn() -> sqlite::Connection {

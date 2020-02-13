@@ -4,6 +4,9 @@ mod util;
 
 use clap::Values;
 
+const METHODS: [&'static str; 6] = ["GET", "PUT", "POST", "DELETE", "PATCH", "HEAD"];
+const PAYLOAD_METHODS: [&'static str; 3] = ["POST", "PUT", "PATCH"];
+
 fn main() {
     let matches = cli::get_app().get_matches();
 

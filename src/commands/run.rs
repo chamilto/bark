@@ -1,3 +1,8 @@
+use std::fs::read_to_string;
+use std::path::Path;
+
+use serde_json::Value;
+
 use crate::util::{bark_print, get_bark_dir, get_db_conn};
 
 fn format_path(path: &mut String, args: &Vec<&str>) {
@@ -35,12 +40,35 @@ fn get_action_cursor<'a>(
     cursor
 }
 
+struct RequestPayload {
+    raw: Option<String>,
+}
+
+impl RequestPayload {
+    fn from_file(file_path: &Path, method: &str) -> RequestPayload {
+        if let Ok(contents) = read_to_string(file_path) {
+            RequestPayload {
+                raw: Some(contents),
+            }
+        } else {
+            if crate::PAYLOAD_METHODS.contains(&method) {
+                bark_print(format!("Warning: Unable to open {:?}", &file_path));
+            }
+
+            RequestPayload { raw: None }
+        }
+    }
+
+    fn to_json(&mut self) -> Option<Value> {
+        if let Some(raw) = &self.raw {
+            serde_json::from_str(raw.as_str()).unwrap()
+        } else {
+            None
+        }
+    }
+}
+
 pub fn on_run(api_name: String, env_name: String, action_name: String, args: &Vec<&str>) {
-    // data
-    // set up timer
-    // make request
-    // end timer
-    // print response details
     let db = get_db_conn();
     let mut cursor = get_action_cursor(&db, &api_name, &env_name, &action_name);
 
@@ -61,23 +89,31 @@ pub fn on_run(api_name: String, env_name: String, action_name: String, args: &Ve
 
     format_path(&mut path, args);
 
-    bark_print(format!(
-        "Executing {} (env:{}): {} with args {:?}",
-        api_name, env_name, action_name, args
-    ));
+    let payload_file_path_str = format!(
+        "{}/api/{}/payloads/{}",
+        get_bark_dir(),
+        &api_name,
+        &payload_filename,
+    );
+    let payload_file_path = Path::new(&payload_file_path_str);
+    let request_payload = RequestPayload::from_file(payload_file_path, &method).to_json();
 
-    if payload_filename != "" {
-        bark_print(format!(
-            "Making {} request to {}{} with payload {}",
-            method, host, path, payload_filename
-        ));
+    let client = reqwest::blocking::Client::new();
+    let req_method = reqwest::Method::from_bytes(method.as_bytes()).unwrap();
+
+    let mut req = client.request(req_method, format!("{}{}", &host, &path).as_str());
+
+    let resp;
+
+    if let Some(payload) = &request_payload {
+        req = req.json(&payload);
+        bark_print(format!("{:#?}", req));
+        resp = req.send().unwrap();
     } else {
-        if ["POST", "PUT"].contains(&method) {
-            bark_print(format!(
-                "Warning: No payload file found. Making {} request with no request body.",
-                method
-            ))
-        }
-        bark_print(format!("Making {} request to {}{}", method, host, path,));
+        bark_print(format!("{:#?}", req));
+        resp = req.send().unwrap();
     }
+
+    bark_print(format!("Status: {}", resp.status()));
+    bark_print(format!("Body: {}", resp.text().unwrap()));
 }

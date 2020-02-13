@@ -75,7 +75,7 @@ pub fn get_app<'a, 'b>() -> App<'a, 'b> {
                             )
                             .arg(
                                 Arg::with_name("payload")
-                                    .required(true)
+                                    .required(false)
                                     .long("payload")
                                     .takes_value(true)
                                     .value_name("payload")

@@ -3,9 +3,6 @@ use std::path::Path;
 
 use crate::util::{bark_print, get_bark_dir, get_db_conn};
 
-const METHODS: [&'static str; 6] = ["GET", "PUT", "POST", "DELETE", "PATCH", "HEAD"];
-const PAYLOAD_METHODS: [&'static str; 3] = ["POST", "PUT", "PATCH"];
-
 pub fn on_new_api(api_name: String) {
     let db = get_db_conn();
 
@@ -148,15 +145,16 @@ pub fn on_new_action(
         return;
     }
 
-    if !METHODS.contains(&&method[..]) {
+    if !crate::METHODS.contains(&&method[..]) {
         bark_print(format!(
             "{} is not a valid method. Must be one of {:?} ",
-            method, METHODS
+            method,
+            crate::METHODS
         ));
         return;
     }
 
-    if !PAYLOAD_METHODS.contains(&&method[..]) && payload_filename == String::from("") {
+    if !crate::PAYLOAD_METHODS.contains(&&method[..]) && payload_filename == String::from("") {
         bark_print(format!(
             "Warning: Creating action with method {} with no payload file.",
             method
